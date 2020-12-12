@@ -15,6 +15,7 @@ public class Map {
     private int bucketSize;
     private List<Point> path;
     private Point initPos;
+    private Set<Point> ps;
 
     Map(BufferedImage image) {
         width= image.getWidth();
@@ -23,6 +24,7 @@ public class Map {
         initPos= new Point(0, 0);
         path= new LinkedList<>();
         path.add(initPos);
+        ps= readPoints(image);
         Set<Point> itemPoints= readPoints(image);
         loadItems(itemPoints);
         calculatePath();
@@ -31,20 +33,18 @@ public class Map {
     private Set<Point> readPoints(BufferedImage image) {
         Set<Point> points= new HashSet<>();
 
-        for (int x= 0; x < width; x+= 5) {
-            for (int y= 0; y < height; y+= 5) {
+        for (int x= 0; x < width; x++ ) {
+            for (int y= 0; y < height; y++ ) {
                 int color= image.getRGB(x, y);
                 int red= (color & 0x00ff0000) >> 16;
                 int green= (color & 0x0000ff00) >> 8;
                 int blue= color & 0x000000ff;
-                double darkness= 1 - (double) (red + green + blue) / 3 / 255;
+                double darkness= 1 - (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
                 if (darkness > R.DARKNESS) {
                     points.add(new Point(x, y));
                 }
             }
         }
-
-        bucketSize= points.size() / 10;
 
         return points;
     }
@@ -74,11 +74,35 @@ public class Map {
             }
         }
 
+        bucketSize= points.size() / buckets.size() / 3;
+
         Collection<Set<Point>> result= new HashSet<>();
         for (Set<Point> bucket : buckets.values()) {
-            if (bucket.size() > bucketSize) result.add(bucket);
+            Set<Point> new_bucket= recenterCluster(bucket);
+            if (new_bucket.size() > bucketSize) result.add(new_bucket);
+
         }
 
+        return result;
+    }
+
+    private Set<Point> recenterCluster(Set<Point> points) {
+        int accX= 0;
+        int accY= 0;
+
+        for (Point p : points) {
+            accX+= p.x;
+            accY+= p.y;
+        }
+
+        Point center= new Point(accX / points.size(), accY / points.size());
+        Set<Point> result= new HashSet<>();
+
+        for (Point p : points) {
+            if (p.distance(center) < R.ITEM_SIZE / 2) {
+                result.add(p);
+            }
+        }
         return result;
     }
 
@@ -109,26 +133,57 @@ public class Map {
         }
     }
 
+    private void permute(List<Item> items, Set<List<Item>> acc, int k) {
+        for (int i= k; i < items.size(); i++ ) {
+            java.util.Collections.swap(items, i, k);
+            permute(items, acc, k + 1);
+            java.util.Collections.swap(items, k, i);
+        }
+        if (k == items.size() - 1) {
+            acc.add(new LinkedList<>(items));
+        }
+    }
+
     private List<Item> visitPlan() {
         List<Item> result= new LinkedList<>();
-        Set<Item> itemsCopy= new HashSet<>(items);
-        Point myPosition= new Point(0, 0);
+        List<Item> itemsCopy= new LinkedList<>(items);
+        Set<List<Item>> permutations= new HashSet<>();
+        permute(itemsCopy, permutations, 0);
 
-        Item next;
-        double minDis, dis;
+        int minDis= Integer.MAX_VALUE;
+        int dis= 0;
+        Point currentP;
 
-        while (!itemsCopy.isEmpty()) {
-            minDis= width + height;
-            next= null;
-            for (Item i : itemsCopy) {
-                dis= myPosition.distance(i.center);
-                if (dis < minDis) {
-                    minDis= dis;
-                    next= i;
-                }
+        for (List<Item> order : permutations) {
+            currentP= initPos;
+            for (Item i : order) {
+                dis+= currentP.distance(i.center);
+                currentP= i.center;
             }
-            result.add(next);
-            itemsCopy.remove(next);
+            if (dis < minDis) {
+                minDis= dis;
+                result= order;
+            }
+            dis= 0;
+        }
+
+//        while (!itemsCopy.isEmpty()) {
+//            minDis= width + height;
+//            next= null;
+//            for (Item i : itemsCopy) {
+//                dis= myPosition.distance(i.center);
+//                if (dis < minDis) {
+//                    minDis= dis;
+//                    next= i;
+//                }
+//            }
+//            result.add(next);
+//            itemsCopy.remove(next);
+//            myPosition= next.center;
+//        }
+
+        for (Item i : result) {
+            System.out.println(i.center);
         }
 
         return result;
@@ -170,7 +225,7 @@ public class Map {
     private Point checkItem(Point pos, Item item) {
         double k= (double) (pos.y - item.center.y) / (double) (pos.x - item.center.x);
         double l= pos.distance(item.center) - item.radius;
-        Point next= endPoint(pos, k, l);
+        Point next= endPoint(pos, k, item.center.x > pos.x ? l : -l);
         path.add(next);
         return next;
     }
@@ -198,9 +253,6 @@ public class Map {
             double y2= (r * r - (e - c) * (x - c)) / (f - d) + d;
             if (Math.abs(y1 - y2) < 20) {
                 intersections.add(new Point((int) x, (int) y1));
-//                System.out.println(y1);
-//                System.out.println(y2);
-//                System.out.println();
             }
         }
 
@@ -214,11 +266,16 @@ public class Map {
             double tx= (b2 - b1) / (k1 - k2);
             double ty= tx * k1 + b1;
             turningPoints.add(new Point((int) tx, (int) ty));
-
         }
 
+        turningPoints.add(endPoint(pos, k1, R.ITEM_SIZE));
+        turningPoints.add(endPoint(pos, k1, -R.ITEM_SIZE));
+        System.out.println(endPoint(pos, k1, R.ITEM_SIZE));
+        System.out.println(endPoint(pos, k1, -R.ITEM_SIZE));
+        System.out.println();
+
         Point next= null;
-        double min_dis= R.Frame_Size * 2;
+        double min_dis= R.Frame_Size;
 
         for (Point tp : turningPoints) {
             double dis= pos.distance(tp) + tp.distance(item2.center);
@@ -236,9 +293,17 @@ public class Map {
     }
 
     private Point endPoint(Point pos, double k, double l) {
-        double theta= Math.atan(k);
-        int x= (int) (pos.x + l * Math.cos(theta));
-        int y= (int) (pos.y + l * Math.sin(theta));
+//        System.out.println("---");
+//        System.out.println(pos);
+//        System.out.println(k);
+//        System.out.println(l);
+
+        double a= Math.sqrt(l * l / (k * k + 1));
+        double b= k * a;
+        int x= (int) (pos.x + (l > 0 ? a : -a));
+        int y= (int) (pos.y + (l > 0 ? b : -b));
+//        System.out.println(new Point(x, y));
+//        System.out.println("---");
         return new Point(x, y);
     }
 
@@ -264,6 +329,10 @@ public class Map {
             Point p1= path.get(i);
             Point p2= path.get(i + 1);
             g.drawLine(p1.x, p1.y, p2.x, p2.y);
+        }
+        for (Point p : ps) {
+            g.setColor(new Color(100, 220, 250));
+            g.fillOval(p.x, p.y, 5, 5);
         }
     }
 
