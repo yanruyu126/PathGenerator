@@ -13,7 +13,7 @@ public class GUI extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(R.Frame_Size, R.Frame_Size);
         setResizable(false);
-        setTitle("Test");
+        setTitle("Path Generator");
 
         init();
     }
