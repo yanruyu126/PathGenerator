@@ -24,7 +24,7 @@ public class GUI extends JFrame {
         setLayout(new GridLayout(1, 1, 0, 0));
 
         BufferedImage image;
-        image= ImageIO.read(new File("src/testImage5.png"));
+        image= ImageIO.read(new File("src/03.jpeg"));
         Map myMap= new Map(image);
         add(new Panel(myMap));
 

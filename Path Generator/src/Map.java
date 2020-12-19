@@ -16,10 +16,12 @@ public class Map {
     private List<Point> path;
     private Point initPos;
     private Set<Point> ps;
+    private double ratio;
 
     Map(BufferedImage image) {
         width= image.getWidth();
         height= image.getHeight();
+        ratio= (double) R.Frame_Size / (double) Math.max(width, height);
         items= new HashSet<>();
         initPos= new Point(0, 0);
         path= new LinkedList<>();
@@ -59,7 +61,7 @@ public class Map {
             Set<Point> centerPoints= buckets.keySet();
 
             for (Point centerP : centerPoints) {
-                if (p.distance(centerP) < R.ITEM_SIZE) {
+                if (p.distance(centerP) < R.ITEM_SIZE / ratio) {
                     Set<Point> bucket= buckets.get(centerP);
                     bucket.add(p);
                     loaded= true;
@@ -99,7 +101,7 @@ public class Map {
         Set<Point> result= new HashSet<>();
 
         for (Point p : points) {
-            if (p.distance(center) < R.ITEM_SIZE / 2) {
+            if (p.distance(center) < R.ITEM_SIZE / 2 / ratio) {
                 result.add(p);
             }
         }
@@ -126,8 +128,8 @@ public class Map {
             centerY= (minY + maxY) / 2;
             itemWidth= maxX - minX;
             itemHeight= maxY - minY;
-            radius= Math.max(itemWidth, itemHeight) / 2;
-            if (itemWidth > R.ITEM_SIZE / 3 && itemHeight > R.ITEM_SIZE / 3) {
+            radius= (int) (Math.max(itemWidth, itemHeight) * 1.2 / 2);
+            if (itemWidth > R.ITEM_SIZE / 3 / ratio && itemHeight > R.ITEM_SIZE / 3 / ratio) {
                 items.add(new Item(centerX, centerY, radius));
             }
         }
@@ -268,10 +270,10 @@ public class Map {
             turningPoints.add(new Point((int) tx, (int) ty));
         }
 
-        turningPoints.add(endPoint(pos, k1, R.ITEM_SIZE));
-        turningPoints.add(endPoint(pos, k1, -R.ITEM_SIZE));
-        System.out.println(endPoint(pos, k1, R.ITEM_SIZE));
-        System.out.println(endPoint(pos, k1, -R.ITEM_SIZE));
+        turningPoints.add(endPoint(pos, k1, R.ITEM_SIZE / ratio));
+        turningPoints.add(endPoint(pos, k1, -R.ITEM_SIZE / ratio));
+        System.out.println(endPoint(pos, k1, R.ITEM_SIZE / ratio));
+        System.out.println(endPoint(pos, k1, -R.ITEM_SIZE / ratio));
         System.out.println();
 
         Point next= null;
@@ -316,23 +318,34 @@ public class Map {
     }
 
     public void draw(Graphics2D g) {
+        int x, y, d;
         for (Item item : items) {
             g.setColor(new Color(0, 100, 200));
-            g.fillOval(item.center.x - item.radius, item.center.y - item.radius, item.radius * 2,
-                item.radius * 2);
+            x= (int) ((item.center.x - item.radius) * ratio);
+            y= (int) ((item.center.y - item.radius) * ratio);
+            d= (int) (item.radius * 2 * ratio);
+            g.fillOval(x, y, d, d);
         }
         for (Point p : path) {
             g.setColor(new Color(100, 100, 100));
-            g.fillOval(p.x, p.y, 10, 10);
+            x= (int) (p.x * ratio);
+            y= (int) (p.y * ratio);
+            g.fillOval(x, y, 10, 10);
         }
         for (int i= 0; i < path.size() - 1; i++ ) {
             Point p1= path.get(i);
             Point p2= path.get(i + 1);
-            g.drawLine(p1.x, p1.y, p2.x, p2.y);
+            x= (int) (p1.x * ratio);
+            y= (int) (p1.y * ratio);
+            int x2= (int) (p2.x * ratio);
+            int y2= (int) (p2.y * ratio);
+            g.drawLine(x, y, x2, y2);
         }
         for (Point p : ps) {
             g.setColor(new Color(100, 220, 250));
-            g.fillOval(p.x, p.y, 5, 5);
+            x= (int) (p.x * ratio);
+            y= (int) (p.y * ratio);
+            g.fillOval(x, y, 5, 5);
         }
     }
 
